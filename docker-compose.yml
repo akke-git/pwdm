@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # 단일 컨테이너 애플리케이션
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.single
+    container_name: password-manager-app
+    restart: always
+    environment:
+      # 백엔드 환경 변수
+      - NODE_ENV=production
+      - DB_HOST=mysql # 운영 중인 MySQL 컨테이너 이름
+      - DB_PORT=3306
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-password}
+      - DB_NAME=${DB_NAME:-password_manager}
+      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret}
+      # 프론트엔드 환경 변수
+      - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
+      # Google OAuth 환경 변수
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+    ports:
+      - "80:80" # 호스트의 80 포트를 컨테이너의 80 포트에 매핑
+    depends_on:
+      - mysql
+    networks:
+      - app-network
+
+  # MySQL 서비스 (기존 컨테이너를 사용할 경우 이 부분은 제거하고 external_networks 사용)
+  # 실제 운영 환경에서는 이 부분을 제거하고 기존 MySQL 컨테이너에 연결
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-password}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-password_manager}
+      - MYSQL_USER=${MYSQL_USER:-user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-password}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local

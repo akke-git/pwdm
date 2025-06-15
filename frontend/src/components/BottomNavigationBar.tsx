@@ -41,6 +41,9 @@ const BottomNavigationBar: React.FC = () => {
         bottom: 0, 
         left: 0, 
         right: 0, 
+        width: '100%', /* 전체 너비 사용 */
+        margin: 0, /* 좌우 여백 제거 */
+        padding: 0, /* 좌우 패딩 제거 */
         zIndex: 1300, 
         border: 'none',
         borderTop: '1px solid rgba(255,255,255,0.05)',
@@ -53,8 +56,13 @@ const BottomNavigationBar: React.FC = () => {
           sx={{ 
             bgcolor: '#1e1e1e', 
             color: '#fff',
+            width: '100%', /* 전체 너비 사용 */
+            margin: 0, /* 좌우 여백 제거 */
+            padding: 0, /* 좌우 패딩 제거 */
             '& .MuiBottomNavigationAction-root': {
-              borderRadius: 0
+              borderRadius: 0,
+              minWidth: 0, /* 최소 너비 제한 제거 */
+              padding: '6px 0', /* 좌우 패딩 줄이기 */
             }
           }}
         >

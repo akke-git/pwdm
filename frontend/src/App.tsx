@@ -122,8 +122,18 @@ theme = responsiveFontSizes(theme);
 
 const MainLayout: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Box component="main" sx={{ flexGrow: 1, pb: 7 /* Height of BottomNavigationBar */ }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100%', overflow: 'hidden' }}>
+      <Box 
+        component="main" 
+        sx={{ 
+          flexGrow: 1, 
+          pb: 7, /* Height of BottomNavigationBar */
+          px: { xs: 0.5, sm: 1, md: 1.5 }, /* 반응형 좌우 패딩 감소: 모바일(xs)에서는 4px, 태블릿(sm)에서는 8px, 데스크탑(md)에서는 12px */
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          overflow: 'hidden' /* 오버플로우 방지 */
+        }}
+      >
         {children}
       </Box>
       <BottomNavigationBar />

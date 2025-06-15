@@ -4,8 +4,7 @@ import {
   Typography, 
   IconButton,
   Avatar,
-  Tooltip,
-  Container
+  Tooltip
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import PasswordTable from '../components/PasswordTable';
@@ -191,23 +190,23 @@ const Dashboard: React.FC = () => {
         bgcolor: '#0a0a0a', // 약간 밝은 다크 테마 배경색으로 변경하여 대비 개선
         width: '100%',
         minHeight: '100vh',
-        px: { xs: 1, sm: 4 },
+        px: { xs: 0.5, sm: 2 }, // 좌우 패딩 감소
         boxSizing: 'border-box',
-        maxWidth: { xs: '100vw', sm: '100%' },
+        maxWidth: '100%', // 최대 너비 제한 제거
         fontFamily: 'apple gothic, sans-serif',
         color: '#fff', // 기본 텍스트 색상을 흰색으로 유지
         position: 'relative',
         zIndex: 1
       }}>
-        <Container maxWidth="lg" sx={{ px: { xs: 1, sm: 2 } }}>
-          <Box 
-            sx={{ 
-              width: '100%',
-              maxWidth: { xs: '100vw', sm: 420, md: 'lg' }, // 모바일은 화면 가득, 데스크탑은 고정폭
-              fontFamily: 'inherit',
-              mx: { sm: 'auto' }
-            }}
-          >
+        {/* Container 제거하고 직접 Box로 대체 */}
+        <Box 
+          sx={{ 
+            width: '100%',
+            maxWidth: { xs: '100%', sm: '600px', md: '900px' }, // 반응형 최대 너비 설정
+            fontFamily: 'inherit',
+            mx: 'auto' // 중앙 정렬
+          }}
+        >
           
           {/* 비밀번호 섹션 헤더 */}
           <Box sx={{ 
@@ -264,7 +263,6 @@ const Dashboard: React.FC = () => {
             />
           </Box>
           </Box>
-        </Container>
       </Box>
       
       {/* 다이얼로그 */}

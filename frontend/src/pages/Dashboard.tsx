@@ -60,7 +60,9 @@ const Dashboard: React.FC = () => {
       minHeight: '100vh',
       width: '100%',
       overflow: 'hidden', // 전체 컨테이너에서 오버플로우 방지
-      fontFamily: 'apple gothic, sans-serif'
+      fontFamily: 'apple gothic, sans-serif',
+      m: 0, // 마진 제거
+      p: 0 // 패딩 제거
     }}>
       {/* 배너 섹션 */}
       <Box sx={{
@@ -186,11 +188,11 @@ const Dashboard: React.FC = () => {
       {/* 메인 컨테이너 - 다크 테마로 변경 */}
       <Box sx={{ 
         flexGrow: 1, 
-        pb: 4,
+        pb: 1, // 하단 패딩 더 감소
         bgcolor: '#0a0a0a', // 약간 밝은 다크 테마 배경색으로 변경하여 대비 개선
         width: '100%',
         minHeight: '100vh',
-        px: { xs: 0.5, sm: 2 }, // 좌우 패딩 감소
+        px: 0, // 좌우 패딩 제거
         boxSizing: 'border-box',
         maxWidth: '100%', // 최대 너비 제한 제거
         fontFamily: 'apple gothic, sans-serif',
@@ -198,13 +200,14 @@ const Dashboard: React.FC = () => {
         position: 'relative',
         zIndex: 1
       }}>
-        {/* Container 제거하고 직접 Box로 대체 */}
+        {/* Container 제거하고 직접 Box로 대체 - 너비 최적화 */}
         <Box 
           sx={{ 
             width: '100%',
-            maxWidth: { xs: '100%', sm: '600px', md: '900px' }, // 반응형 최대 너비 설정
+            maxWidth: { xs: '100%', sm: '90%', md: '85%', lg: '80%' }, // 최대 너비를 현재의 절반 정도로 줄임
             fontFamily: 'inherit',
-            mx: 'auto' // 중앙 정렬
+            mx: 'auto', // 중앙 정렬
+            px: 0 // 내부 패딩 제거
           }}
         >
           
@@ -213,11 +216,11 @@ const Dashboard: React.FC = () => {
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center',
-            mb: { xs: 2.5, sm: 3 },
+            mb: { xs: 1.5, sm: 2 }, // 하단 마진 감소
             flexDirection: { xs: 'column', sm: 'row' },
-            gap: { xs: 2.5, sm: 0 },
+            gap: { xs: 1.5, sm: 0 }, // 간격 감소
             width: '100%',
-            maxWidth: { xs: 420, sm: '100%' },
+            maxWidth: '100%', // 최대 너비 100%로 설정
             color: '#fff' // 텍스트 색상을 흰색으로 변경
           }}>
             <Typography 
@@ -253,8 +256,11 @@ const Dashboard: React.FC = () => {
               border: 'none',
               backgroundColor: '#1e1e1e', // 다크 테마 배경색
               width: '100%',
-              maxWidth: { xs: 420, sm: '100%' },
-              mx: 'auto'
+              maxWidth: '100%', // 모든 화면 크기에서 100% 너비 사용
+              mx: 'auto',
+              '& .MuiTableContainer-root': { // 테이블 컨테이너 여백 제거
+                px: 0
+              }
             }}
           >
             <PasswordTable 

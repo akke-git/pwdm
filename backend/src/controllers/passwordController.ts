@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
+import { Parser } from 'json2csv';
 
 // 파일 업로드를 위한 multer 설정
 const storage = multer.diskStorage({
@@ -19,16 +20,17 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'import-' + uniqueSuffix + '.json');
+    const ext = file.mimetype === 'text/csv' ? '.csv' : '.json';
+    cb(null, 'import-' + uniqueSuffix + ext);
   }
 });
 
 export const upload = multer({ 
   storage: storage,
   fileFilter: function (req, file, cb) {
-    // JSON 파일만 허용
-    if (file.mimetype !== 'application/json') {
-      return cb(new Error('JSON 파일만 업로드할 수 있습니다.'));
+    // CSV 파일만 허용
+    if (file.mimetype !== 'text/csv' && file.originalname.split('.').pop()?.toLowerCase() !== 'csv') {
+      return cb(new Error('CSV 파일만 업로드할 수 있습니다.'));
     }
     cb(null, true);
   }
@@ -315,7 +317,7 @@ export const deletePasswordItem = async (req: Request, res: Response) => {
 };
 
 /**
- * 비밀번호 항목 내보내기 (암호화된 JSON 형식)
+ * 비밀번호 항목 내보내기 (JSON/CSV 형식)
  */
 export const exportPasswordItems = async (req: Request, res: Response) => {
   let filePath: string | undefined;
@@ -329,7 +331,7 @@ export const exportPasswordItems = async (req: Request, res: Response) => {
       });
     }
 
-    const { ids } = req.body; // 내보낼 항목 ID 배열 (선택적)
+    const { ids, format = 'json' } = req.query; // 내보낼 항목 ID 배열 (선택적)과 형식(json 또는 csv)
 
     // 사용자 정보 가져오기
     const user = await User.findByPk(userId);
@@ -343,54 +345,120 @@ export const exportPasswordItems = async (req: Request, res: Response) => {
     // PasswordItemService를 사용하여 복호화된 항목 데이터 가져오기
     // ids 파라미터는 현재 getAllDecryptedItemsForUser에서 사용하지 않지만, 추후 선택적 내보내기를 위해 남겨둘 수 있음
     const decryptedItems = await PasswordItemService.getAllDecryptedItemsForUser(parseInt(userId, 10));
-
-    const exportData = {
-      version: "1.0.0", // 내보내기 파일 버전
-      exportedAt: new Date().toISOString(),
-      items: decryptedItems
-    };
-
+    
     const exportId = uuidv4();
-    const exportFileName = `password-export-${userId}-${exportId}.json`; // 파일명에 userId 추가
-
     const tempDir = path.join(__dirname, '../../temp/exports'); // exports 하위 디렉토리 사용
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
-    filePath = path.join(tempDir, exportFileName);
-    fs.writeFileSync(filePath, JSON.stringify(exportData, null, 2), 'utf8');
+    // 형식에 따라 파일 생성
+    if (format === 'csv') {
+      // CSV 형식으로 내보내기
+      try {
+        // CSV 변환을 위한 데이터 준비 (필요한 필드만 포함)
+        const csvData = decryptedItems.map(item => ({
+          name: item.title,
+          'site url': item.url || '',
+          id: item.username || '',
+          password: item.password || '',
+          category: item.category || '',
+          memo: item.notes || ''
+        }));
+        
+        // JSON을 CSV로 변환 - 한글 문제 해결을 위한 옵션 추가
+        const parser = new Parser({ 
+          fields: ['name', 'site url', 'id', 'password', 'category', 'memo'],
+          delimiter: ',',
+          quote: '"',
+          header: true,
+          eol: '\r\n' // Windows 형식의 줄바꿈 사용
+        });
+        
+        // CSV 생성
+        const csv = parser.parse(csvData);
+        
+        // BOM(Byte Order Mark) 추가하여 한글 인코딩 문제 해결
+        const BOM = '\uFEFF';
+        const csvWithBOM = BOM + csv;
+        
+        const exportFileName = `password-export-${userId}-${exportId}.csv`;
+        filePath = path.join(tempDir, exportFileName);
+        fs.writeFileSync(filePath, csvWithBOM, 'utf8');
+        
+        res.download(filePath, exportFileName, (err) => {
+          if (err) {
+            console.error('CSV 파일 다운로드 중 오류 발생:', err);
+            if (filePath && fs.existsSync(filePath)) {
+              try {
+                fs.unlinkSync(filePath);
+              } catch (unlinkErr) {
+                console.error('다운로드 오류 후 임시 CSV 파일 삭제 실패:', unlinkErr);
+              }
+            }
+            if (!res.headersSent) {
+              res.status(500).json({
+                success: false,
+                message: 'CSV 파일을 내보내는 중 오류가 발생했습니다.'
+              });
+            }
+            return;
+          }
+          
+          // 성공적으로 다운로드 완료 후 임시 파일 삭제
+          if (filePath && fs.existsSync(filePath)) {
+            try {
+              fs.unlinkSync(filePath);
+            } catch (unlinkErr) {
+              console.error('내보내기 성공 후 임시 CSV 파일 삭제 실패:', unlinkErr);
+            }
+          }
+        });
+      } catch (csvError) {
+        console.error('CSV 변환 오류:', csvError);
+        throw new Error('CSV 형식으로 변환하는 중 오류가 발생했습니다.');
+      }
+    } else {
+      // JSON 형식으로 내보내기 (기존 코드)
+      const exportData = {
+        version: "1.0.0", // 내보내기 파일 버전
+        exportedAt: new Date().toISOString(),
+        items: decryptedItems
+      };
 
-    res.download(filePath, exportFileName, (err) => {
-      if (err) {
-        console.error('파일 다운로드 중 오류 발생:', err);
-        // 오류 발생 시에도 파일 삭제 시도 (파일이 존재한다면)
+      const exportFileName = `password-export-${userId}-${exportId}.json`; // 파일명에 userId 추가
+      filePath = path.join(tempDir, exportFileName);
+      fs.writeFileSync(filePath, JSON.stringify(exportData, null, 2), 'utf8');
+
+      res.download(filePath, exportFileName, (err) => {
+        if (err) {
+          console.error('JSON 파일 다운로드 중 오류 발생:', err);
+          if (filePath && fs.existsSync(filePath)) {
+            try {
+              fs.unlinkSync(filePath);
+            } catch (unlinkErr) {
+              console.error('다운로드 오류 후 임시 JSON 파일 삭제 실패:', unlinkErr);
+            }
+          }
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              message: 'JSON 파일을 내보내는 중 오류가 발생했습니다.'
+            });
+          }
+          return;
+        }
+
+        // 성공적으로 다운로드 완료 후 임시 파일 삭제
         if (filePath && fs.existsSync(filePath)) {
           try {
             fs.unlinkSync(filePath);
           } catch (unlinkErr) {
-            console.error('다운로드 오류 후 임시 파일 삭제 실패:', unlinkErr);
+            console.error('내보내기 성공 후 임시 JSON 파일 삭제 실패:', unlinkErr);
           }
         }
-        // 클라이언트에게 오류 응답을 보내지 않았을 경우 (이미 헤더가 전송되었을 수 있음)
-        if (!res.headersSent) {
-          res.status(500).json({
-            success: false,
-            message: '파일을 내보내는 중 오류가 발생했습니다.'
-          });
-        }
-        return;
-      } // res.download 콜백 내의 if(err) 블록 종료
-
-      // 성공적으로 다운로드 완료 후 임시 파일 삭제
-      if (filePath && fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-        } catch (unlinkErr) {
-          console.error('내보내기 성공 후 임시 파일 삭제 실패:', unlinkErr);
-        }
-      }
-    }); // res.download 콜백 종료
+      });
+    }
   } catch (error: any) { // exportPasswordItems 함수의 메인 try 블록에 대한 catch 블록
     console.error('비밀번호 항목 내보내기 오류:', error);
     if (filePath && fs.existsSync(filePath)) {
@@ -400,12 +468,21 @@ export const exportPasswordItems = async (req: Request, res: Response) => {
             console.error('오류 발생 후 임시 내보내기 파일 삭제 실패:', unlinkErr);
         }
     }
-    res.status(500).json({
-      success: false,
-      message: '파일을 내보내는 중 예기치 않은 오류가 발생했습니다.'
-    });
+    
+    if (!res.headersSent) {
+      const statusCode = error.statusCode || 500;
+      const message = error.message || '서버 오류가 발생했습니다.';
+      res.status(statusCode).json({
+        success: false,
+        message: message
+      });
+    }
   }
-}; // exportPasswordItems 함수 종료
+};
+
+/**
+ * 비밀번호 항목 가져오기 (CSV 파일)
+ */
 export const importPasswordItems = async (req: FileRequest, res: Response) => {
   try {
     const userIdString = (req as any).user.id;
@@ -429,39 +506,103 @@ export const importPasswordItems = async (req: FileRequest, res: Response) => {
         message: '가져올 파일이 없습니다.'
       });
     }
-
     const filePath = req.file.path;
 
-    // 파일 내용 파싱
-    let importData;
+    // CSV 파일 읽기
+    let importItems = [];
     try {
-      const fileContent = fs.readFileSync(filePath, 'utf8');
-      importData = JSON.parse(fileContent);
+      // BOM 제거를 위해 파일 내용을 읽어옴
+      let fileContent = fs.readFileSync(filePath, 'utf8');
+      
+      // BOM 제거 (있는 경우)
+      if (fileContent.charCodeAt(0) === 0xFEFF) {
+        fileContent = fileContent.slice(1);
+      }
+      
+      // CSV 파싱
+      const lines = fileContent.split(/\r?\n/);
+      const headers = lines[0].split(',').map(header => {
+        // 따옴표 제거
+        return header.replace(/^"|"$/g, '').trim();
+      });
+      
+      // 필요한 필드 인덱스 찾기
+      const nameIndex = headers.findIndex(h => h.toLowerCase() === 'name');
+      const urlIndex = headers.findIndex(h => h.toLowerCase() === 'site url');
+      const idIndex = headers.findIndex(h => h.toLowerCase() === 'id');
+      const passwordIndex = headers.findIndex(h => h.toLowerCase() === 'password');
+      const categoryIndex = headers.findIndex(h => h.toLowerCase() === 'category');
+      const memoIndex = headers.findIndex(h => h.toLowerCase() === 'memo');
+      
+      if (nameIndex === -1) {
+        throw new Error('CSV 파일에 name 필드가 없습니다.');
+      }
+      
+      // 기존 비밀번호 항목 조회 (중복 확인을 위해)
+      const existingItems = await PasswordItemService.getAll(userId, {});
+      const existingTitles = new Set(existingItems.map(item => item.title.toLowerCase()));
+      const titleCounts: Record<string, number> = {};
+      
+      // 데이터 행 처리
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue; // 빈 줄 건너뛰기
+        
+        const values = lines[i].split(',').map(val => val.replace(/^"|"$/g, '').trim());
+        
+        // 필수 필드가 없는 경우 건너뛰기
+        if (!values[nameIndex]) continue;
+        
+        // 사이트명 중복 처리
+        let title = values[nameIndex];
+        const lowerTitle = title.toLowerCase();
+        
+        // 이미 존재하는 사이트명이거나 현재 가져오기 중 중복된 사이트명인 경우
+        if (existingTitles.has(lowerTitle) || titleCounts[lowerTitle]) {
+          titleCounts[lowerTitle] = (titleCounts[lowerTitle] || 1) + 1;
+          title = `${title} ${titleCounts[lowerTitle]}`;
+        }
+        
+        // 현재 가져오기 중인 항목 중복 추적을 위해 추가
+        existingTitles.add(title.toLowerCase());
+        
+        // 항목 생성
+        importItems.push({
+          title: title,
+          url: urlIndex !== -1 ? values[urlIndex] : '',
+          username: idIndex !== -1 ? values[idIndex] : '',
+          password: passwordIndex !== -1 ? values[passwordIndex] : '',
+          notes: memoIndex !== -1 ? values[memoIndex] : '',
+          category: categoryIndex !== -1 ? values[categoryIndex] : '',  // 카테고리 필드 값 사용
+          tags: [],      // 기본 값
+          isFavorite: false  // 기본 값
+        });
+      }
+      
     } catch (e) {
+      console.error('CSV 파일 파싱 오류:', e);
       // 파일 읽기 또는 파싱 오류 시 임시 파일 삭제 후 오류 응답
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
       return res.status(400).json({
         success: false,
-        message: '잘못된 형식의 파일이거나 파일을 읽을 수 없습니다.'
+        message: '잘못된 CSV 형식이거나 파일을 읽을 수 없습니다.'
       });
     }
 
-    // 파일 형식 검증 (기본적인 구조만 확인)
-    if (!importData || typeof importData !== 'object' || !Array.isArray(importData.items)) {
-       // 파일 형식 오류 시 임시 파일 삭제 후 오류 응답
+    // 파싱된 항목이 없는 경우
+    if (importItems.length === 0) {
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
       return res.status(400).json({
         success: false,
-        message: '지원되지 않는 파일 형식이거나 items 배열이 없습니다.'
+        message: '가져올 비밀번호 항목이 없습니다.'
       });
     }
 
     // PasswordItemService를 사용하여 항목 가져오기 로직 호출
-    const results = await PasswordItemService.importItems(userId, importData.items);
+    const results = await PasswordItemService.importItems(userId, importItems);
 
     // 임시 파일 삭제
     if (fs.existsSync(filePath)) {
@@ -472,8 +613,9 @@ export const importPasswordItems = async (req: FileRequest, res: Response) => {
       success: true,
       message: '비밀번호 항목 가져오기가 완료되었습니다.',
       results: {
-        total: importData.items.length,
-        ...results
+        total: importItems.length,
+        imported: results.imported || importItems.length,
+        errors: results.errors || 0
       }
     });
 
@@ -491,7 +633,7 @@ export const importPasswordItems = async (req: FileRequest, res: Response) => {
     const message = error.message || '서버에서 오류가 발생했습니다. 파일을 가져오지 못했습니다.';
     res.status(statusCode).json({
       success: false,
-      message: message,
+      message: message
     });
   }
 };

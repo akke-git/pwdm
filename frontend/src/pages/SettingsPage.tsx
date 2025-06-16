@@ -1,7 +1,9 @@
 import React from 'react';
 import { Box, Container, Typography, Paper, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider } from '@mui/material';
-import CategoryIcon from '@mui/icons-material/Category'; // Using a generic category icon
+import CategoryIcon from '@mui/icons-material/Category';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
 import { Link as RouterLink } from 'react-router-dom';
 
 const SettingsPage: React.FC = () => {
@@ -17,11 +19,29 @@ const SettingsPage: React.FC = () => {
       }}>
         <List>
           <ListItem disablePadding>
+            <ListItemButton component={RouterLink} to="/settings/export">
+              <ListItemIcon>
+                <FileDownloadIcon />
+              </ListItemIcon>
+              <ListItemText primary="비밀번호 내보내기 (CSV/JSON)" sx={{ fontFamily: 'apple gothic' }} />
+            </ListItemButton>
+          </ListItem>
+          <Divider />
+          <ListItem disablePadding>
+            <ListItemButton component={RouterLink} to="/settings/import">
+              <ListItemIcon>
+                <FileUploadIcon />
+              </ListItemIcon>
+              <ListItemText primary="비밀번호 가져오기 (CSV)" sx={{ fontFamily: 'apple gothic' }} />
+            </ListItemButton>
+          </ListItem>
+          <Divider />
+          <ListItem disablePadding>
             <ListItemButton component={RouterLink} to="/settings/categories">
               <ListItemIcon>
                 <CategoryIcon />
               </ListItemIcon>
-              <ListItemText primary="Category Management" sx={{ fontFamily: 'apple gothic' }} />
+              <ListItemText primary="카테고리 관리" sx={{ fontFamily: 'apple gothic' }} />
             </ListItemButton>
           </ListItem>
           <Divider />
@@ -30,7 +50,7 @@ const SettingsPage: React.FC = () => {
               <ListItemIcon>
                 <AccountCircleIcon />
               </ListItemIcon>
-              <ListItemText primary="User Profile Management" sx={{ fontFamily: 'apple gothic' }} />
+              <ListItemText primary="프로필 설정" sx={{ fontFamily: 'apple gothic' }} />
             </ListItemButton>
           </ListItem>
           {/* Add more settings items here */}

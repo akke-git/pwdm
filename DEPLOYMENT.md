@@ -1,182 +1,473 @@
-# 패스워드 매니저 배포 가이드
+# PWDM 프로젝트 배포 가이드
 
-이 문서는 패스워드 매니저 애플리케이션을 도커 컨테이너로 배포하는 과정을 설명합니다.
+이 문서는 PWDM(Password Manager) 프로젝트를 리눅스 도커 환경에 컨테이너로 배포하는 방법을 상세히 설명합니다.
+
+## 목차
+
+1. [사전 준비사항](#사전-준비사항)
+2. [도커 환경 설정](#도커-환경-설정)
+3. [도커 이미지 빌드 및 배포](#도커-이미지-빌드-및-배포)
+4. [배포 후 코드 업데이트 방법](#배포-후-코드-업데이트-방법)
+5. [PWA 앱 생성 방법](#pwa-앱-생성-방법)
 
 ## 사전 준비사항
 
-- 도커와 도커 컴포즈가 설치된 리눅스 서버
-- MySQL 컨테이너가 운영 중인 서버 (또는 새로 설치할 예정)
-- SSH 접근 권한
+### 필수 설치 항목
 
-## 1. 프로젝트 준비
+- Docker: 최신 버전 (20.10.x 이상)
+- Docker Compose: 최신 버전 (2.x 이상)
 
-### 1.1 프로젝트 복제
+### 환경 변수 설정
 
-```bash
-git clone <repository-url> password-manager
-cd password-manager
-```
-
-### 1.2 환경 변수 설정
-
-#### 백엔드 환경 변수
-
-백엔드 디렉토리에서 `.env.example` 파일을 참고하여 `.env` 파일을 생성합니다:
+1. 프로젝트 루트 디렉토리에서 환경 변수 파일을 생성합니다:
 
 ```bash
-cd backend
-cp .env.example .env
-# 편집기로 .env 파일을 열어 실제 값으로 수정
-nano .env
+cp env.production.example .env.production
 ```
 
-다음 환경 변수들을 설정해야 합니다:
-- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`: 데이터베이스 연결 정보
-- `JWT_SECRET`: JWT 토큰 암호화에 사용되는 비밀키
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: Google OAuth 인증에 필요한 정보
+2. `.env.production` 파일을 열고 필요한 환경 변수를 설정합니다:
+   - 데이터베이스 연결 정보
+   - JWT 시크릿 키
+   - 기타 필요한 API 키 등
 
-#### 프론트엔드 환경 변수
+## 도커 환경 설정
 
-프론트엔드 디렉토리에서 `.env.example` 파일을 참고하여 `.env` 파일을 생성합니다:
+### Dockerfile 생성
+
+프로젝트 루트 디렉토리에 `Dockerfile`을 생성합니다:
+
+```dockerfile
+# 기본 이미지로 Node.js 사용
+FROM node:20-alpine AS builder
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# 백엔드 종속성 설치
+COPY backend/package*.json ./backend/
+RUN cd backend && npm ci
+
+# 프론트엔드 종속성 설치
+COPY frontend/package*.json ./frontend/
+RUN cd frontend && npm ci
+
+# 소스 코드 복사
+COPY backend ./backend
+COPY frontend ./frontend
+
+# 백엔드 빌드
+RUN cd backend && npm run build
+
+# 프론트엔드 빌드
+RUN cd frontend && npm run build
+
+# 실행 이미지
+FROM node:20-alpine
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# Nginx 설치
+RUN apk add --no-cache nginx
+
+# 백엔드 종속성 설치 (프로덕션 모드)
+COPY backend/package*.json ./backend/
+RUN cd backend && npm ci --only=production
+
+# 빌드된 백엔드 파일 복사
+COPY --from=builder /app/backend/dist ./backend/dist
+
+# 빌드된 프론트엔드 파일 복사
+COPY --from=builder /app/frontend/dist ./frontend/dist
+
+# Nginx 설정 파일 복사
+COPY frontend/nginx.conf /etc/nginx/http.d/default.conf
+
+# 시작 스크립트 복사
+COPY docker-entrypoint.sh /
+RUN chmod +x /docker-entrypoint.sh
+
+# 포트 노출
+EXPOSE 80 3000
+
+# 컨테이너 시작 시 실행할 명령
+ENTRYPOINT ["/docker-entrypoint.sh"]
+```
+
+### docker-entrypoint.sh 스크립트 생성
+
+프로젝트 루트 디렉토리에 `docker-entrypoint.sh` 스크립트를 생성합니다:
 
 ```bash
-cd frontend
-cp .env.example .env
-# 편집기로 .env 파일을 열어 실제 값으로 수정
-nano .env
+#!/bin/sh
+
+# Nginx 시작 (프론트엔드 서빙)
+nginx
+
+# 백엔드 서버 시작
+cd /app/backend
+node dist/index.js
 ```
 
-다음 환경 변수들을 설정해야 합니다:
-- `VITE_GOOGLE_CLIENT_ID`: Google OAuth 인증에 필요한 클라이언트 ID
-- `VITE_API_URL`: 백엔드 API URL
+### Docker Compose 설정
 
-#### 운영 환경 환경 변수
+프로젝트 루트 디렉토리에 `docker-compose.yml` 파일을 생성합니다:
 
-프로젝트 루트 디렉토리에 있는 `env.production.example` 파일을 참고하여 `.env` 파일을 생성합니다:
+```yaml
+version: '3.8'
+
+services:
+  pwdm-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pwdm-app
+    restart: unless-stopped
+    ports:
+      - "80:80"     # 프론트엔드 (Nginx)
+      - "3000:3000" # 백엔드 API
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env.production
+    volumes:
+      - pwdm-data:/app/backend/data
+
+  # 필요한 경우 MySQL 서비스 추가
+  db:
+    image: mysql:8.0
+    container_name: pwdm-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+volumes:
+  pwdm-data:
+  mysql-data:
+```
+
+## 도커 이미지 빌드 및 배포
+
+### 1. 환경 변수 설정 확인
+
+배포 전 `.env.production` 파일이 올바르게 설정되어 있는지 확인합니다.
+
+### 2. 도커 이미지 빌드
 
 ```bash
-cd /path/to/password-manager
-cp env.production.example .env
-# 편집기로 .env 파일을 열어 실제 값으로 수정
-nano .env
-```
-
-## 2. 데이터베이스 마이그레이션
-
-### 2.1 로컬 데이터베이스 덤프 생성
-
-로컬 개발 환경에서 다음 명령을 실행하여 데이터베이스 덤프를 생성합니다:
-
-```bash
-cd scripts
-./db-dump.sh
-# 생성된 덤프 파일(password_manager_YYYYMMDD_HHMMSS.sql)을 확인
-```
-
-### 2.2 운영 서버에 덤프 파일 전송
-
-SCP 또는 다른 방법을 사용하여 덤프 파일을 운영 서버로 전송합니다:
-
-```bash
-scp password_manager_YYYYMMDD_HHMMSS.sql user@server:/path/to/password-manager/scripts/
-```
-
-### 2.3 운영 서버에서 데이터베이스 생성 및 복원
-
-운영 서버에서 다음 명령을 실행하여 데이터베이스를 생성하고 덤프 파일을 복원합니다:
-
-```bash
-# MySQL 컨테이너에 접속하여 데이터베이스 생성
-docker exec -it mysql mysql -u root -p
-```
-
-MySQL 프롬프트에서:
-
-```sql
-CREATE DATABASE IF NOT EXISTS password_manager;
-EXIT;
-```
-
-그런 다음 덤프 파일을 복원합니다:
-
-```bash
-cd scripts
-./db-restore.sh password_manager_YYYYMMDD_HHMMSS.sql
-```
-
-## 3. 애플리케이션 배포
-
-### 3.1 도커 컴포즈로 애플리케이션 빌드 및 실행
-
-```bash
-cd /path/to/password-manager
 docker-compose build
+```
+
+### 3. 컨테이너 실행
+
+```bash
 docker-compose up -d
 ```
 
-이 명령은 백엔드와 프론트엔드 컨테이너를 빌드하고 백그라운드에서 실행합니다.
-
-### 3.2 배포 확인
-
-웹 브라우저에서 서버 IP 주소 또는 도메인으로 접속하여 애플리케이션이 정상적으로 작동하는지 확인합니다:
-
-```
-http://서버_IP_주소
-```
-
-## 4. 문제 해결
-
-### 4.1 로그 확인
-
-컨테이너 로그를 확인하여 문제를 진단합니다:
+### 4. 로그 확인
 
 ```bash
-# 백엔드 로그 확인
-docker logs password-manager-backend
-
-# 프론트엔드 로그 확인
-docker logs password-manager-frontend
-
-# MySQL 로그 확인 (필요한 경우)
-docker logs mysql
+docker-compose logs -f
 ```
 
-### 4.2 컨테이너 재시작
+### 5. 배포 확인
 
-문제가 발생한 경우 컨테이너를 재시작합니다:
+웹 브라우저에서 다음 URL로 접속하여 배포가 성공적으로 이루어졌는지 확인합니다:
+- 프론트엔드: http://서버IP
+- 백엔드 API: http://서버IP:3000
+
+## 배포 후 코드 업데이트 방법
+
+코드 업데이트가 필요한 경우 다음 절차를 따릅니다:
+
+### 1. 코드 변경사항 적용
+
+로컬 개발 환경에서 코드를 변경하고 Git 저장소에 푸시합니다.
+
+### 2. 서버에서 최신 코드 가져오기
 
 ```bash
-docker-compose restart backend
-docker-compose restart frontend
+git pull origin main
 ```
 
-### 4.3 전체 서비스 재시작
-
-필요한 경우 모든 서비스를 재시작합니다:
+### 3. 도커 이미지 재빌드 및 컨테이너 재시작
 
 ```bash
 docker-compose down
-docker-compose up -d
-```
-
-## 5. 백업 및 유지보수
-
-### 5.1 정기적인 데이터베이스 백업
-
-cron 작업을 설정하여 정기적으로 데이터베이스를 백업합니다:
-
-```bash
-# crontab -e에 다음 줄 추가 (매일 새벽 3시에 백업)
-0 3 * * * /path/to/password-manager/scripts/db-dump.sh > /path/to/backups/backup_$(date +\%Y\%m\%d).log 2>&1
-```
-
-### 5.2 애플리케이션 업데이트
-
-새 버전으로 업데이트하려면:
-
-```bash
-cd /path/to/password-manager
-git pull
 docker-compose build
 docker-compose up -d
 ```
+
+### 자동화된 업데이트 스크립트 (선택사항)
+
+프로젝트 루트 디렉토리에 `update.sh` 스크립트를 생성하여 업데이트 과정을 자동화할 수 있습니다:
+
+```bash
+#!/bin/bash
+
+# 최신 코드 가져오기
+git pull origin main
+
+# 도커 컨테이너 재빌드 및 재시작
+docker-compose down
+docker-compose build
+docker-compose up -d
+
+echo "업데이트가 완료되었습니다."
+```
+
+스크립트에 실행 권한을 부여합니다:
+
+```bash
+chmod +x update.sh
+```
+
+이후 업데이트가 필요할 때 다음 명령어로 간단히 실행할 수 있습니다:
+
+```bash
+./update.sh
+```
+
+## PWA 앱 생성 방법
+
+PWA(Progressive Web App)로 변환하여 모바일 및 데스크톱에서 앱처럼 사용할 수 있습니다.
+
+### 1. 프론트엔드 프로젝트에 PWA 관련 파일 추가
+
+#### manifest.json 생성
+
+`frontend/public/manifest.json` 파일을 생성합니다:
+
+```json
+{
+  "name": "PWDM - 비밀번호 관리자",
+  "short_name": "PWDM",
+  "description": "안전한 비밀번호 관리 애플리케이션",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4285f4",
+  "icons": [
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+```
+
+#### 서비스 워커 생성
+
+`frontend/public/service-worker.js` 파일을 생성합니다:
+
+```javascript
+// 캐시 이름 설정
+const CACHE_NAME = 'pwdm-cache-v1';
+
+// 캐시할 파일 목록
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  // CSS, JS 파일 등 필요한 정적 자원 추가
+];
+
+// 서비스 워커 설치 시 캐시 생성
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        return cache.addAll(urlsToCache);
+      })
+  );
+});
+
+// 네트워크 요청 가로채기
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request)
+      .then((response) => {
+        // 캐시에 있으면 캐시된 응답 반환
+        if (response) {
+          return response;
+        }
+        
+        // 캐시에 없으면 네트워크 요청
+        return fetch(event.request)
+          .then((response) => {
+            // 유효한 응답이 아니면 그대로 반환
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+            
+            // 응답을 복제하여 캐시에 저장
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+              
+            return response;
+          });
+      })
+  );
+});
+
+// 이전 캐시 정리
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+});
+```
+
+#### index.html 수정
+
+`frontend/index.html` 파일에 다음 코드를 추가합니다:
+
+```html
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#4285f4" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+  <title>PWDM - 비밀번호 관리자</title>
+  <style>
+    @font-face {
+      font-family: 'Apple Gothic';
+      src: local('Apple Gothic');
+    }
+    body {
+      font-family: 'Apple Gothic', sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+  <script>
+    // 서비스 워커 등록
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then((registration) => {
+            console.log('ServiceWorker 등록 성공:', registration.scope);
+          })
+          .catch((error) => {
+            console.log('ServiceWorker 등록 실패:', error);
+          });
+      });
+    }
+  </script>
+</body>
+</html>
+```
+
+### 2. 아이콘 생성
+
+PWA에 필요한 다양한 크기의 아이콘을 생성하여 `frontend/public/icons/` 디렉토리에 저장합니다. 아이콘 생성은 온라인 도구를 사용하거나 디자인 툴을 활용할 수 있습니다.
+
+### 3. vite.config.ts 수정
+
+PWA 지원을 위해 Vite 설정을 수정합니다:
+
+```typescript
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+  },
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
+});
+```
+
+### 4. 재배포
+
+변경사항을 적용한 후 도커 이미지를 재빌드하고 배포합니다:
+
+```bash
+docker-compose down
+docker-compose build
+docker-compose up -d
+```
+
+### 5. PWA 설치 확인
+
+배포된 웹 애플리케이션에 접속하여 브라우저의 주소 표시줄 오른쪽에 설치 아이콘이 표시되는지 확인합니다. 이 아이콘을 클릭하여 PWA를 설치할 수 있습니다.
+
+모바일 기기에서는 브라우저 메뉴에서 "홈 화면에 추가" 옵션을 선택하여 PWA를 설치할 수 있습니다.

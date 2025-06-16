@@ -35,6 +35,7 @@ interface GoogleUserInfo {
   exp: number; // 만료 시간
   iat: number; // 발급 시간
   sub: string; // Subject (사용자 ID)
+  originalToken?: string; // 원본 토큰 저장
 }
 
 const Login: React.FC = () => {
@@ -65,6 +66,7 @@ const Login: React.FC = () => {
   // 구글 로그인 관련 상태
   const [googleLoginStep, setGoogleLoginStep] = useState(false);
   const [googleUserInfo, setGoogleUserInfo] = useState<GoogleUserInfo | null>(null); // 구글 사용자 정보
+  const [googleCredential, setGoogleCredential] = useState<string>(''); // 구글 원본 토큰
   const navigate = useNavigate();
   const { showMessage } = useSnackbar();
 
@@ -102,6 +104,12 @@ const Login: React.FC = () => {
     try {
       // 구글에서 받은 토큰 디코딩 및 GoogleUserInfo 타입으로 캐스팅
       const decoded = jwtDecode(credentialResponse.credential) as GoogleUserInfo;
+      
+      // 원본 토큰 저장
+      setGoogleCredential(credentialResponse.credential);
+      
+      // 사용자 정보에 원본 토큰 추가
+      decoded.originalToken = credentialResponse.credential;
       setGoogleUserInfo(decoded);
       setGoogleLoginStep(true); // 마스터 비밀번호 입력 단계로 전환
       
@@ -134,7 +142,7 @@ const Login: React.FC = () => {
       if (googleLoginStep && googleUserInfo) {
         // 구글 로그인 후 마스터 비밀번호 입력 경우
         res = await api.post('/auth/google-login', {
-          googleToken: googleUserInfo.jti, // 구글 토큰 ID
+          googleToken: googleCredential, // 원본 ID 토큰 사용
           email: googleUserInfo.email,
           name: googleUserInfo.name,
           masterPassword,
@@ -176,24 +184,34 @@ const Login: React.FC = () => {
       border: 'none',
       outline: 'none'
     }}>
-    <Container maxWidth="sm" sx={{ border: 'none', outline: 'none' }}>
+    {/* Container의 maxWidth를 md로 변경하고, 패딩 제거 */}
+    <Container 
+      maxWidth="md" 
+      sx={{ 
+        border: 'none', 
+        outline: 'none',
+        px: 0, // 좌우 패딩 제거
+        width: '100%',
+        maxWidth: { xs: '100%', sm: '95%', md: '90%' } // 반응형으로 너비 조정
+      }}
+    >
       <Box sx={{ 
-        mt: { xs: 4, sm: 8 }, 
+        mt: { xs: 2, sm: 4 }, // 상단 여백 줄임
         display: 'flex', 
         flexDirection: 'column', 
         alignItems: 'center',
         border: 'none',
-        outline: 'none'
+        outline: 'none',
+        width: '100%'
       }}>
         <Paper 
           elevation={0} 
           sx={{ 
-            p: 4, 
+            p: { xs: 2, sm: 3 }, // 반응형 패딩 적용
             width: '100%', 
             borderRadius: 2,
             bgcolor: '#000', // 검은색으로 통일
             color: '#fff', // 텍스트 색상 흰색
-            // backdropFilter: 'blur(10px)', // 제거
             border: 'none',
             outline: 'none'
           }}

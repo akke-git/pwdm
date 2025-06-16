@@ -6,6 +6,8 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import SearchPage from './pages/SearchPage';
 import SettingsPage from './pages/SettingsPage';
+import PasswordExportPage from './pages/PasswordExportPage';
+import PasswordImportPage from './pages/PasswordImportPage';
 import BottomNavigationBar from './components/BottomNavigationBar';
 import { SnackbarProvider } from './components/SnackbarContext';
 import './App.css';
@@ -173,10 +175,26 @@ function App() {
               } 
             />
             <Route 
-              path="/settings/*" // Allow nested routes for settings
+              path="/settings" // Main settings page
               element={
                 <RequireAuth>
                   <MainLayout><SettingsPage /></MainLayout>
+                </RequireAuth>
+              } 
+            />
+            <Route 
+              path="/settings/export" // Password export page
+              element={
+                <RequireAuth>
+                  <MainLayout><PasswordExportPage /></MainLayout>
+                </RequireAuth>
+              } 
+            />
+            <Route 
+              path="/settings/import" // Password import page
+              element={
+                <RequireAuth>
+                  <MainLayout><PasswordImportPage /></MainLayout>
                 </RequireAuth>
               } 
             />

@@ -31,10 +31,12 @@ interface JwtPayload {
  */
 export const register = async (req: Request, res: Response) => {
   try {
+    console.log('회원가입 요청 받음:', req.body);
     const { username, email, password, masterPassword } = req.body;
     
     // 필수 필드 검증
     if (!username || !email || !password || !masterPassword) {
+      console.log('필수 필드 검증 실패:', { username, email, password: password ? '있음' : '없음', masterPassword: masterPassword ? '있음' : '없음' });
       return res.status(400).json({ 
         success: false, 
         message: '모든 필수 필드를 입력해주세요.' 
@@ -50,12 +52,24 @@ export const register = async (req: Request, res: Response) => {
       });
     }
     
+    console.log('마스터 비밀번호 처리 시작...');  
     // 마스터 비밀번호로부터 안전한 암호화 키 유도
-    const { key, salt } = deriveKeyFromPassword(masterPassword);
+    console.log('마스터 비밀번호로부터 키 유도 시도...');
+    let encryptionKey: string;
+    let keySalt: string;
     
-    // 암호화 키와 솔트를 저장하기 위해 문자열로 변환
-    const encryptionKey = key.toString('hex');
-    const keySalt = salt.toString('hex');
+    try {
+      const { key, salt } = deriveKeyFromPassword(masterPassword);
+      console.log('키 유도 성공:', { saltLength: salt.length });
+      
+      // 암호화 키와 솔트를 저장하기 위해 문자열로 변환
+      encryptionKey = key.toString('hex');
+      keySalt = salt.toString('hex');
+      console.log('키 변환 성공:', { encryptionKeyLength: encryptionKey.length, keySaltLength: keySalt.length });
+    } catch (error: any) {
+      console.error('키 유도 중 오류 발생:', error);
+      throw new Error(`키 유도 오류: ${error.message || '알 수 없는 오류'}`);
+    }
     
     // 사용자 생성
     const user = await User.create({
@@ -80,11 +94,26 @@ export const register = async (req: Request, res: Response) => {
       message: '사용자 등록이 완료되었습니다.',
       data: userData,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('사용자 등록 오류:', error);
+    console.error('오류 상세 정보:', { 
+      message: error.message, 
+      stack: error.stack,
+      name: error.name,
+      code: error.code
+    });
+    
+    // 사용자에게 표시할 오류 메시지
+    let errorMessage = '서버 오류가 발생했습니다.';
+    
+    // 데이터베이스 관련 오류인 경우 더 자세한 정보 제공
+    if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
+      errorMessage = '입력 데이터가 유효하지 않습니다. 입력 정보를 확인해주세요.';
+    }
+    
     res.status(500).json({ 
       success: false, 
-      message: '서버 오류가 발생했습니다.' 
+      message: errorMessage
     });
   }
 };

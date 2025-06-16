@@ -48,10 +48,14 @@ app.listen(PORT, async () => {
     await sequelize.authenticate();
     console.log('데이터베이스 연결 성공');
     
-    // 데이터베이스 동기화 (개발 환경에서만 사용)
+    // 데이터베이스 동기화
+    // 개발 환경에서는 alter 옵션으로, 프로덕션에서는 force 옵션 없이 실행
     if (process.env.NODE_ENV === 'development') {
       await sequelize.sync({ alter: true });
-      console.log('데이터베이스 모델 동기화 완료');
+      console.log('개발 환경: 데이터베이스 모델 동기화 완료');
+    } else {
+      await sequelize.sync();
+      console.log('프로덕션 환경: 데이터베이스 모델 동기화 완료');
     }
     
     // 만료된 세션 정리 스케줄러 (하루에 한 번)

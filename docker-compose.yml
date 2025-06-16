@@ -8,7 +8,7 @@ services:
     container_name: pwdm
     restart: unless-stopped
     ports:
-      - "80:80"     # 프론트엔드 (Nginx)
+      - "9090:80"   # 프론트엔드 (Nginx)
       - "3000:3000" # 백엔드 API
     environment:
       - NODE_ENV=production
@@ -16,6 +16,12 @@ services:
       - .env.production
     volumes:
       - pwdm-data:/app/backend/data
+    networks:
+      - akke
+
+networks:
+  akke:
+    external: true 
 
   # 필요한 경우 MySQL 서비스 추가
   # db:
@@ -35,3 +41,7 @@ services:
 volumes:
   pwdm-data:
   # mysql-data:
+
+networks:
+  akke:
+    external: true

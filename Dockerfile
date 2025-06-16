@@ -31,15 +31,15 @@ WORKDIR /app
 # Nginx 설치
 RUN apk add --no-cache nginx
 
-# 백엔드 종속성 설치 (프로덕션 모드)
+# 백엔드 종속성 설치 (개발 종속성 포함)
 COPY backend/package*.json ./backend/
-RUN cd backend && npm ci --only=production
+RUN cd backend && npm ci
 
 # 빌드된 백엔드 파일 복사
 COPY --from=builder /app/backend/dist ./backend/dist
 
 # 빌드된 프론트엔드 파일 복사
-COPY --from=builder /app/frontend/dist ./frontend/dist
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 
 # Nginx 설정 파일 복사
 COPY frontend/nginx.conf /etc/nginx/http.d/default.conf

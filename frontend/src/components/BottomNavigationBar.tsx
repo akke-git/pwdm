@@ -44,11 +44,13 @@ const BottomNavigationBar: React.FC = () => {
         width: '100%', /* 전체 너비 사용 */
         margin: 0, /* 좌우 여백 제거 */
         padding: 0, /* 좌우 패딩 제거 */
-        zIndex: 1300, 
+        paddingBottom: 'env(safe-area-inset-bottom)', /* iOS 안전 영역 고려 */
+        zIndex: 9999, /* 더 높은 z-index 값 사용 */
         border: 'none',
         borderTop: '1px solid rgba(255,255,255,0.05)',
-        boxShadow: 'none',
+        boxShadow: '0px -2px 10px rgba(0,0,0,0.1)', /* 약간의 그림자 추가 */
         bgcolor: '#1e1e1e',
+        display: 'block !important', /* 반드시 표시하도록 설정 */
       }}>
         <BottomNavigation
           showLabels

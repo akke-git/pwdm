@@ -23,25 +23,6 @@ networks:
   akke:
     external: true 
 
-  # 필요한 경우 MySQL 서비스 추가
-  # db:
-  #   image: mysql:8.0
-  #   container_name: pwdm-db
-  #   restart: unless-stopped
-  #   environment:
-  #     MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-  #     MYSQL_DATABASE: ${DB_NAME}
-  #     MYSQL_USER: ${DB_USER}
-  #     MYSQL_PASSWORD: ${DB_PASSWORD}
-  #   volumes:
-  #     - mysql-data:/var/lib/mysql
-  #   ports:
-  #     - "3306:3306"
-
 volumes:
   pwdm-data:
-  # mysql-data:
 
-networks:
-  akke:
-    external: true

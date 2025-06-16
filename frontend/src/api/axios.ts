@@ -1,7 +1,13 @@
 import axios from 'axios';
 
+// 현재 환경에 따라 baseURL 설정
+// 개발 환경에서는 http://localhost:3000/api 사용
+// 프로덕션(도커) 환경에서는 /api 사용
+// Vite에서는 process.env 대신 import.meta.env 사용
+const isDevelopment = import.meta.env.DEV; // DEV는 개발 환경에서 true
+
 const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: isDevelopment ? 'http://localhost:3000/api' : '/api',
   withCredentials: true,
 });
 

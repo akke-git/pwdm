@@ -1,11 +1,20 @@
 // 캐시 이름 설정
-const CACHE_NAME = 'pwdm-cache-v1';
+const CACHE_NAME = 'pwdm-cache-v2'; // 버전 업데이트
 
 // 캐시할 파일 목록
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
+  // 아이콘 파일 추가
+  '/images/icons/icon-72x72.png',
+  '/images/icons/icon-96x96.png',
+  '/images/icons/icon-128x128.png',
+  '/images/icons/icon-144x144.png',
+  '/images/icons/icon-152x152.png',
+  '/images/icons/icon-192x192.png',
+  '/images/icons/icon-384x384.png',
+  '/images/icons/icon-512x512.png',
   // CSS, JS 파일 등 필요한 정적 자원 추가
 ];
 

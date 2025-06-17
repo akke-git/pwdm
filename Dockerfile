@@ -4,6 +4,9 @@ FROM node:20-alpine AS builder
 # 작업 디렉토리 설정
 WORKDIR /app
 
+# canvas 패키지 빌드에 필요한 의존성 설치
+RUN apk add --no-cache python3 make g++ cairo-dev jpeg-dev pango-dev giflib-dev
+
 # 백엔드 종속성 설치
 COPY backend/package*.json ./backend/
 RUN cd backend && npm ci

@@ -1,0 +1,70 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+
+  <!-- defs: 그라데이션, 하이라이트, 3D 필터 -->
+  <defs>
+    <!-- 배경용 그라데이션 -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2A2E33"></stop>
+      <stop offset="100%" stop-color="#1F2428"></stop>
+    </linearGradient>
+
+    <!-- 자물쇠용 그라데이션 -->
+    <linearGradient id="lockGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5EF9E0"></stop>
+      <stop offset="100%" stop-color="#22BCAA"></stop>
+    </linearGradient>
+
+    <!-- 자물쇠 하이라이트 그라데이션 -->
+    <radialGradient id="highlightGrad" cx="40%" cy="20%" r="60%">
+      <stop offset="0%" stop-color="white" stop-opacity="0.4"></stop>
+      <stop offset="100%" stop-color="white" stop-opacity="0"></stop>
+    </radialGradient>
+
+    <!-- 3D 효과 필터: 드롭 섀도우 + 내부 섀도우 -->
+    <filter id="3dEffect" x="-50%" y="-50%" width="200%" height="200%">
+      <!-- drop shadow -->
+      <feOffset in="SourceAlpha" dx="0" dy="16" result="offOut"></feOffset>
+      <feGaussianBlur in="offOut" stdDeviation="16" result="blurOut"></feGaussianBlur>
+      <feColorMatrix in="blurOut" type="matrix" values="0 0 0 0 0
+                0 0 0 0 0
+                0 0 0 0 0
+                0 0 0 0.2 0" result="dropShadow"></feColorMatrix>
+      <!-- inner shadow -->
+      <feOffset in="SourceAlpha" dx="0" dy="4" result="offIn"></feOffset>
+      <feGaussianBlur in="offIn" stdDeviation="8" result="blurIn"></feGaussianBlur>
+      <feComposite in="blurIn" in2="SourceAlpha" operator="out" result="innerShadow"></feComposite>
+      <!-- 합성 -->
+      <feBlend in="SourceGraphic" in2="dropShadow" mode="normal" result="withDrop"></feBlend>
+      <feBlend in="withDrop" in2="innerShadow" mode="normal"></feBlend>
+    </filter>
+  </defs>
+
+  <!-- 배경 -->
+  <rect x="0" y="0" width="1024" height="1024" rx="200" fill="url(#bgGrad)"></rect>
+
+  <!-- 자물쇠 그룹 (3D 필터 적용) -->
+  <g filter="url(#3dEffect)">
+    <!-- 몸통 -->
+    <rect x="256" y="384" width="512" height="384" rx="32" fill="url(#lockGrad)"></rect>
+    <!-- 걸쇠 -->
+    <path d="M384 384 v-64 a128 128 0 0 1 256 0 v64" fill="none" stroke="url(#lockGrad)" stroke-width="64" stroke-linecap="round"></path>
+    <!-- 키홀 -->
+    <circle cx="512" cy="576" r="48" fill="#1F2428"></circle>
+    <rect x="496" y="576" width="32" height="96" fill="#1F2428"></rect>
+
+    <!-- 하이라이트 오버레이 -->
+    <rect x="256" y="384" width="512" height="384" rx="32" fill="url(#highlightGrad)" style="mix-blend-mode:screen"></rect>
+  </g>
+
+  <!-- 체크리스트 줄 -->
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <rect x="624" y="464" width="192" height="32" rx="16" fill="url(#lockGrad)"></rect>
+    <rect x="624" y="560" width="192" height="32" rx="16" fill="url(#lockGrad)"></rect>
+    <rect x="624" y="656" width="192" height="32" rx="16" fill="url(#lockGrad)"></rect>
+
+    <!-- 체크마크 -->
+    <path d="M864 480 l-32 32 l-64 -64" fill="none" stroke="url(#lockGrad)" stroke-width="32"></path>
+    <path d="M864 576 l-32 32 l-64 -64" fill="none" stroke="url(#lockGrad)" stroke-width="32"></path>
+    <path d="M864 672 l-32 32 l-64 -64" fill="none" stroke="url(#lockGrad)" stroke-width="32"></path>
+  </g>
+</svg>
